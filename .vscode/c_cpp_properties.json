@@ -3,7 +3,8 @@
         {
             "name": "Mac",
             "includePath": [
-                "${workspaceFolder}/**"
+                "${workspaceFolder}/**",
+                "~/esp/esp-idf/components/**"
             ],
             "defines": [],
             "macFrameworkPath": [

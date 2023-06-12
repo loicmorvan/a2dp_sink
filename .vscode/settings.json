@@ -3,5 +3,8 @@
     "idf.adapterTargetName": "esp32",
     "files.exclude": {
         "build/": true
+    },
+    "files.associations": {
+        "i2s.h": "c"
     }
 }
