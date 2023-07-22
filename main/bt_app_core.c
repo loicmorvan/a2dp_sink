@@ -143,9 +143,9 @@ static void bt_i2s_task_handler(void *arg)
                     temp = temp * s_volume;
                     
                     // 127 is the max volume settable.
-                    // However, the signal is way too high for the PCM5102, thus we divide it by 8.
-                    // 127 * 8 ~= 1024
-                    temp = temp / 1024;
+                    // However, the signal is way too high for the PCM5102, thus we divide it by 4.
+                    // 127 * 4 ~= 512
+                    temp = temp / 512;
 
                     *pcmdata = (int16_t)temp;
                     pcmdata++;

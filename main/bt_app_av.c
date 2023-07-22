@@ -77,7 +77,7 @@ static esp_avrc_rn_evt_cap_mask_t s_avrc_peer_rn_cap;
                                              /* AVRC target notification capability bit mask */
 static _lock_t s_volume_lock;
 static TaskHandle_t s_vcs_task_hdl = NULL;    /* handle for volume change simulation task */
-uint8_t s_volume = 0;                 /* local volume value */
+uint8_t s_volume = 63;                 /* local volume value */
 static bool s_volume_notify;                 /* notify volume change or not */
 i2s_chan_handle_t tx_chan = NULL;
 
