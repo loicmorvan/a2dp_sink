@@ -83,6 +83,8 @@ void bt_i2s_task_shut_down(void);
  *
  * @return size if writteen ringbuffer successfully, 0 others
  */
-size_t write_ringbuf(const uint8_t *data, size_t size);
+size_t write_ringbuf(const uint16_t *data, size_t size);
+
+extern uint8_t s_volume;
 
 #endif /* __BT_APP_CORE_H__ */

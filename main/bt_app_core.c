@@ -15,12 +15,7 @@
 #include "freertos/task.h"
 #include "esp_log.h"
 #include "bt_app_core.h"
-#ifdef CONFIG_EXAMPLE_A2DP_SINK_OUTPUT_INTERNAL_DAC
-// DAC DMA mode is only supported by the legacy I2S driver, it will be replaced once DAC has its own DMA dirver
-#include "driver/i2s.h"
-#else
 #include "driver/i2s_std.h"
-#endif
 #include "freertos/ringbuf.h"
 
 
@@ -60,9 +55,7 @@ static uint16_t ringbuffer_mode = RINGBUFFER_MODE_PROCESSING;
 /*********************************
  * EXTERNAL FUNCTION DECLARATIONS
  ********************************/
-#ifndef CONFIG_EXAMPLE_A2DP_SINK_OUTPUT_INTERNAL_DAC
 extern i2s_chan_handle_t tx_chan;
-#endif
 
 /*******************************
  * STATIC FUNCTION DEFINITIONS
@@ -116,7 +109,7 @@ static void bt_app_task_handler(void *arg)
 
 static void bt_i2s_task_handler(void *arg)
 {
-    uint8_t *data = NULL;
+    uint16_t *data = NULL;
     size_t item_size = 0;
     /**
      * The total length of DMA buffer of I2S is:
@@ -126,23 +119,39 @@ static void bt_i2s_task_handler(void *arg)
     const size_t item_size_upto = 240 * 6;
     size_t bytes_written = 0;
 
-    for (;;) {
-        if (pdTRUE == xSemaphoreTake(s_i2s_write_semaphore, portMAX_DELAY)) {
-            for (;;) {
+    for (;;)
+    {
+        if (pdTRUE == xSemaphoreTake(s_i2s_write_semaphore, portMAX_DELAY))
+        {
+            for (;;)
+            {
                 item_size = 0;
                 /* receive data from ringbuffer and write it to I2S DMA transmit buffer */
-                data = (uint8_t *)xRingbufferReceiveUpTo(s_ringbuf_i2s, &item_size, (TickType_t)pdMS_TO_TICKS(20), item_size_upto);
-                if (item_size == 0) {
+                data = (uint16_t *)xRingbufferReceiveUpTo(s_ringbuf_i2s, &item_size, (TickType_t)pdMS_TO_TICKS(20), item_size_upto);
+                if (item_size == 0)
+                {
                     ESP_LOGI(BT_APP_CORE_TAG, "ringbuffer underflowed! mode changed: RINGBUFFER_MODE_PREFETCHING");
                     ringbuffer_mode = RINGBUFFER_MODE_PREFETCHING;
                     break;
                 }
 
-            #ifdef CONFIG_EXAMPLE_A2DP_SINK_OUTPUT_INTERNAL_DAC
-                i2s_write(0, data, item_size, &bytes_written, portMAX_DELAY);
-            #else
+                // https://github.com/YetAnotherElectronicsChannel/ESP32_Bluetooth_Audio_Receiver/blob/master/code/bt_app_core.c
+                int16_t *pcmdata = (int16_t *)data;
+                for (int i = 0; i < item_size / 2; i++)
+                {
+                    int32_t temp = (int32_t)(*pcmdata);
+                    temp = temp * s_volume;
+                    
+                    // 127 is the max volume settable.
+                    // However, the signal is way too high for the PCM5102, thus we divide it by 8.
+                    // 127 * 8 ~= 1024
+                    temp = temp / 1024;
+
+                    *pcmdata = (int16_t)temp;
+                    pcmdata++;
+                }
+
                 i2s_channel_write(tx_chan, data, item_size, &bytes_written, portMAX_DELAY);
-            #endif
                 vRingbufferReturnItem(s_ringbuf_i2s, (void *)data);
             }
         }
@@ -229,7 +238,7 @@ void bt_i2s_task_shut_down(void)
     }
 }
 
-size_t write_ringbuf(const uint8_t *data, size_t size)
+size_t write_ringbuf(const uint16_t *data, size_t size)
 {
     size_t item_size = 0;
     BaseType_t done = pdFALSE;

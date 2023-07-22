@@ -21,12 +21,7 @@
 
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
-#ifdef CONFIG_EXAMPLE_A2DP_SINK_OUTPUT_INTERNAL_DAC
-// DAC DMA mode is only supported by the legacy I2S driver, it will be replaced once DAC has its own DMA dirver
-#include "driver/i2s.h"
-#else
 #include "driver/i2s_std.h"
-#endif
 
 #include "sys/lock.h"
 
@@ -60,8 +55,6 @@ static void bt_i2s_driver_install(void);
 static void bt_i2s_driver_uninstall(void);
 /* set volume by remote controller */
 static void volume_set_by_controller(uint8_t volume);
-/* set volume by local host */
-static void volume_set_by_local_host(uint8_t volume);
 /* a2dp event handler */
 static void bt_av_hdl_a2d_evt(uint16_t event, void *p_param);
 /* avrc controller event handler */
@@ -84,11 +77,9 @@ static esp_avrc_rn_evt_cap_mask_t s_avrc_peer_rn_cap;
                                              /* AVRC target notification capability bit mask */
 static _lock_t s_volume_lock;
 static TaskHandle_t s_vcs_task_hdl = NULL;    /* handle for volume change simulation task */
-static uint8_t s_volume = 0;                 /* local volume value */
+uint8_t s_volume = 0;                 /* local volume value */
 static bool s_volume_notify;                 /* notify volume change or not */
-#ifndef CONFIG_EXAMPLE_A2DP_SINK_OUTPUT_INTERNAL_DAC
 i2s_chan_handle_t tx_chan = NULL;
-#endif
 
 /********************************
  * STATIC FUNCTION DEFINITIONS
@@ -167,25 +158,6 @@ static void bt_av_notify_evt_handler(uint8_t event_id, esp_avrc_rn_param_t *even
 
 void bt_i2s_driver_install(void)
 {
-#ifdef CONFIG_EXAMPLE_A2DP_SINK_OUTPUT_INTERNAL_DAC
-    /* I2S configuration parameters */
-    i2s_config_t i2s_config = {
-        .mode = I2S_MODE_MASTER | I2S_MODE_TX | I2S_MODE_DAC_BUILT_IN,
-        .sample_rate = 44100,
-        .bits_per_sample = 16,
-        .channel_format = I2S_CHANNEL_FMT_RIGHT_LEFT,       /* 2-channels */
-        .communication_format = I2S_COMM_FORMAT_STAND_MSB,
-        .dma_buf_count = 6,
-        .dma_buf_len = 60,
-        .intr_alloc_flags = 0,                              /* default interrupt priority */
-        .tx_desc_auto_clear = true                          /* auto clear tx descriptor on underflow */
-    };
-
-    /* enable I2S */
-    ESP_ERROR_CHECK(i2s_driver_install(0, &i2s_config, 0, NULL));
-    ESP_ERROR_CHECK(i2s_set_dac_mode(I2S_DAC_CHANNEL_BOTH_EN));
-    ESP_ERROR_CHECK(i2s_set_pin(0, NULL));
-#else
     i2s_chan_config_t chan_cfg = I2S_CHANNEL_DEFAULT_CONFIG(I2S_NUM_0, I2S_ROLE_MASTER);
     chan_cfg.auto_clear = true;
     i2s_std_config_t std_cfg = {
@@ -208,43 +180,21 @@ void bt_i2s_driver_install(void)
     ESP_ERROR_CHECK(i2s_new_channel(&chan_cfg, &tx_chan, NULL));
     ESP_ERROR_CHECK(i2s_channel_init_std_mode(tx_chan, &std_cfg));
     ESP_ERROR_CHECK(i2s_channel_enable(tx_chan));
-#endif
 }
 
 void bt_i2s_driver_uninstall(void)
 {
-#ifdef CONFIG_EXAMPLE_A2DP_SINK_OUTPUT_INTERNAL_DAC
-    i2s_driver_uninstall(0);
-#else
     ESP_ERROR_CHECK(i2s_channel_disable(tx_chan));
     ESP_ERROR_CHECK(i2s_del_channel(tx_chan));
-#endif
 }
 
 static void volume_set_by_controller(uint8_t volume)
 {
-    ESP_LOGI(BT_RC_TG_TAG, "Volume is set by remote controller to: %"PRIu32"%%", (uint32_t)volume * 100 / 0x7f);
+    ESP_LOGI(BT_RC_TG_TAG, "Volume is set by remote controller to: %"PRIu32"%%", (long unsigned int)volume);
     /* set the volume in protection of lock */
     _lock_acquire(&s_volume_lock);
     s_volume = volume;
     _lock_release(&s_volume_lock);
-}
-
-static void volume_set_by_local_host(uint8_t volume)
-{
-    ESP_LOGI(BT_RC_TG_TAG, "Volume is set locally to: %"PRIu32"%%", (uint32_t)volume * 100 / 0x7f);
-    /* set the volume in protection of lock */
-    _lock_acquire(&s_volume_lock);
-    s_volume = volume;
-    _lock_release(&s_volume_lock);
-
-    /* send notification response to remote AVRCP controller */
-    if (s_volume_notify) {
-        esp_avrc_rn_param_t rn_param;
-        rn_param.volume = s_volume;
-        esp_avrc_tg_send_rn_rsp(ESP_AVRC_RN_VOLUME_CHANGE, ESP_AVRC_RN_RSP_CHANGED, &rn_param);
-        s_volume_notify = false;
-    }
 }
 
 static void bt_av_hdl_a2d_evt(uint16_t event, void *p_param)
@@ -302,16 +252,14 @@ static void bt_av_hdl_a2d_evt(uint16_t event, void *p_param)
             if (oct0 & (0x01 << 3)) {
                 ch_count = 1;
             }
-        #ifdef CONFIG_EXAMPLE_A2DP_SINK_OUTPUT_INTERNAL_DAC
-            i2s_set_clk(0, sample_rate, 16, ch_count);
-        #else
+            
             i2s_channel_disable(tx_chan);
             i2s_std_clk_config_t clk_cfg = I2S_STD_CLK_DEFAULT_CONFIG(sample_rate);
             i2s_std_slot_config_t slot_cfg = I2S_STD_MSB_SLOT_DEFAULT_CONFIG(I2S_DATA_BIT_WIDTH_16BIT, ch_count);
             i2s_channel_reconfig_std_clock(tx_chan, &clk_cfg);
             i2s_channel_reconfig_std_slot(tx_chan, &slot_cfg);
             i2s_channel_enable(tx_chan);
-        #endif
+
             ESP_LOGI(BT_AV_TAG, "Configure audio player: %x-%x-%x-%x",
                      a2d->audio_cfg.mcc.cie.sbc[0],
                      a2d->audio_cfg.mcc.cie.sbc[1],
@@ -509,7 +457,7 @@ void bt_app_a2d_cb(esp_a2d_cb_event_t event, esp_a2d_cb_param_t *param)
 
 void bt_app_a2d_data_cb(const uint8_t *data, uint32_t len)
 {
-    write_ringbuf(data, len);
+    write_ringbuf((const uint16_t*)data, len);
 
     /* log the number every 100 packets */
     if (++s_pkt_cnt % 100 == 0) {
