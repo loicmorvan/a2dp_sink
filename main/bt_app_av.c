@@ -1,9 +1,3 @@
-/*
- * SPDX-FileCopyrightText: 2021-2022 Espressif Systems (Shanghai) CO LTD
- *
- * SPDX-License-Identifier: Unlicense OR CC0-1.0
- */
-
 #include <stdint.h>
 #include <stdbool.h>
 #include <stdlib.h>
@@ -74,7 +68,6 @@ static esp_avrc_rn_evt_cap_mask_t s_avrc_peer_rn_cap;
                                              /* AVRC target notification capability bit mask */
 static _lock_t s_volume_lock;
 uint8_t s_volume = 63;                  /* local volume value */
-static bool s_volume_notify;                 /* notify volume change or not */
 i2s_chan_handle_t tx_chan = NULL;
 
 /********************************
@@ -393,7 +386,6 @@ static void bt_av_hdl_avrc_tg_evt(uint16_t event, void *p_param)
     case ESP_AVRC_TG_REGISTER_NOTIFICATION_EVT: {
         ESP_LOGI(BT_RC_TG_TAG, "AVRC register event notification: %d, param: 0x%"PRIx32, rc->reg_ntf.event_id, rc->reg_ntf.event_parameter);
         if (rc->reg_ntf.event_id == ESP_AVRC_RN_VOLUME_CHANGE) {
-            s_volume_notify = true;
             esp_avrc_rn_param_t rn_param;
             rn_param.volume = s_volume;
             esp_avrc_tg_send_rn_rsp(ESP_AVRC_RN_VOLUME_CHANGE, ESP_AVRC_RN_RSP_INTERIM, &rn_param);
