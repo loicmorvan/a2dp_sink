@@ -109,7 +109,7 @@ static void bt_app_task_handler(void *arg)
 
 static void bt_i2s_task_handler(void *arg)
 {
-    uint16_t *data = NULL;
+    int16_t *data = NULL;
     size_t item_size = 0;
     /**
      * The total length of DMA buffer of I2S is:
@@ -127,7 +127,7 @@ static void bt_i2s_task_handler(void *arg)
             {
                 item_size = 0;
                 /* receive data from ringbuffer and write it to I2S DMA transmit buffer */
-                data = (uint16_t *)xRingbufferReceiveUpTo(s_ringbuf_i2s, &item_size, (TickType_t)pdMS_TO_TICKS(20), item_size_upto);
+                data = (int16_t *)xRingbufferReceiveUpTo(s_ringbuf_i2s, &item_size, (TickType_t)pdMS_TO_TICKS(20), item_size_upto);
                 if (item_size == 0)
                 {
                     ESP_LOGI(BT_APP_CORE_TAG, "ringbuffer underflowed! mode changed: RINGBUFFER_MODE_PREFETCHING");
@@ -136,7 +136,7 @@ static void bt_i2s_task_handler(void *arg)
                 }
 
                 // https://github.com/YetAnotherElectronicsChannel/ESP32_Bluetooth_Audio_Receiver/blob/master/code/bt_app_core.c
-                int16_t *pcmdata = (int16_t *)data;
+                int16_t *pcmdata = data;
                 for (int i = 0; i < item_size / 2; i++)
                 {
                     int32_t temp = (int32_t)(*pcmdata);
@@ -238,7 +238,7 @@ void bt_i2s_task_shut_down(void)
     }
 }
 
-size_t write_ringbuf(const uint16_t *data, size_t size)
+void write_ringbuf(const uint8_t *data, uint32_t size)
 {
     size_t item_size = 0;
     BaseType_t done = pdFALSE;
@@ -250,7 +250,7 @@ size_t write_ringbuf(const uint16_t *data, size_t size)
             ESP_LOGI(BT_APP_CORE_TAG, "ringbuffer data decreased! mode changed: RINGBUFFER_MODE_PROCESSING");
             ringbuffer_mode = RINGBUFFER_MODE_PROCESSING;
         }
-        return 0;
+        return;
     }
 
     done = xRingbufferSend(s_ringbuf_i2s, (void *)data, size, (TickType_t)0);
@@ -270,6 +270,4 @@ size_t write_ringbuf(const uint16_t *data, size_t size)
             }
         }
     }
-
-    return done ? size : 0;
 }

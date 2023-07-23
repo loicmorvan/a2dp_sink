@@ -80,10 +80,8 @@ void bt_i2s_task_shut_down(void);
  *
  * @param [in] data  pointer to data stream
  * @param [in] size  data length in byte
- *
- * @return size if writteen ringbuffer successfully, 0 others
  */
-size_t write_ringbuf(const uint16_t *data, size_t size);
+void write_ringbuf(const uint8_t *data, uint32_t size);
 
 extern uint8_t s_volume;
 

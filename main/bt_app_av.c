@@ -66,7 +66,6 @@ static void bt_av_hdl_avrc_tg_evt(uint16_t event, void *p_param);
  * STATIC VARIABLE DEFINITIONS
  ******************************/
 
-static uint32_t s_pkt_cnt = 0;               /* count for audio packet */
 static esp_a2d_audio_state_t s_audio_state = ESP_A2D_AUDIO_STATE_STOPPED;
                                              /* audio stream datapath state */
 static const char *s_a2d_conn_state_str[] = {"Disconnected", "Connecting", "Connected", "Disconnecting"};
@@ -227,9 +226,6 @@ static void bt_av_hdl_a2d_evt(uint16_t event, void *p_param)
         a2d = (esp_a2d_cb_param_t *)(p_param);
         ESP_LOGI(BT_AV_TAG, "A2DP audio state: %s", s_a2d_audio_state_str[a2d->audio_stat.state]);
         s_audio_state = a2d->audio_stat.state;
-        if (ESP_A2D_AUDIO_STATE_STARTED == a2d->audio_stat.state) {
-            s_pkt_cnt = 0;
-        }
         break;
     }
     /* when audio codec is configured, this event comes */
@@ -452,16 +448,6 @@ void bt_app_a2d_cb(esp_a2d_cb_event_t event, esp_a2d_cb_param_t *param)
     default:
         ESP_LOGE(BT_AV_TAG, "Invalid A2DP event: %d", event);
         break;
-    }
-}
-
-void bt_app_a2d_data_cb(const uint8_t *data, uint32_t len)
-{
-    write_ringbuf((const uint16_t*)data, len);
-
-    /* log the number every 100 packets */
-    if (++s_pkt_cnt % 100 == 0) {
-        ESP_LOGI(BT_AV_TAG, "Audio packet count: %"PRIu32, s_pkt_cnt);
     }
 }
 

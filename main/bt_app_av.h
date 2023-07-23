@@ -25,14 +25,6 @@
 void bt_app_a2d_cb(esp_a2d_cb_event_t event, esp_a2d_cb_param_t *param);
 
 /**
- * @brief  callback function for A2DP sink audio data stream
- *
- * @param [out] data  data stream writteen by application task
- * @param [in]  len   length of data stream in byte
- */
-void bt_app_a2d_data_cb(const uint8_t *data, uint32_t len);
-
-/**
  * @brief  callback function for AVRCP controller
  *
  * @param [in] event  event id
